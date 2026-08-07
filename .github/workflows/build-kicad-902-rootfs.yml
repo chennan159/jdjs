@@ -1,0 +1,33 @@
+name: Build KiCad 9.0.2 rootfs
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Debian 13 KiCad 9.0.2 rootfs
+        shell: bash
+        run: |
+          set -euxo pipefail
+          docker pull debian:trixie
+          docker create --name kicad902 debian:trixie sleep infinity
+          docker start kicad902
+          docker exec kicad902 bash -lc 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends kicad ca-certificates && test "$(kicad-cli --version)" = "9.0.2"'
+          docker stop kicad902
+          docker export kicad902 | gzip -1 > /tmp/kicad-9.0.2-debian13-rootfs.tar.gz
+          printf '9.0.2\n' > /tmp/KICAD_VERSION.txt
+          sha256sum /tmp/kicad-9.0.2-debian13-rootfs.tar.gz > /tmp/ROOTFS_SHA256.txt
+
+      - name: Upload rootfs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kicad-9.0.2-debian13-rootfs
+          path: |
+            /tmp/kicad-9.0.2-debian13-rootfs.tar.gz
+            /tmp/KICAD_VERSION.txt
+            /tmp/ROOTFS_SHA256.txt
+          compression-level: 0
+          retention-days: 1
